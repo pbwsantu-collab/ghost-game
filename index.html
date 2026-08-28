@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Shoot the Ghost</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a12;
+    color: #e0e0ff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #ui {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to bottom, rgba(10,10,20,0.9), transparent);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .stat {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  #score { color: #7CFC00; }
+  #time  { color: #FFD700; }
+  #combo { color: #FF69B4; opacity: 0; transition: opacity 0.2s; }
+
+  #game-area {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    overflow: hidden;
+  }
+
+  .ghost {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    border-radius: 50% 50% 40% 40%;
+    background: radial-gradient(circle at 30% 30%, #fff, #a0a0ff 40%, #4040aa);
+    box-shadow: 0 0 20px #8080ff, inset 0 -8px 12px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: transform 0.12s ease-out, opacity 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
+  .ghost::before,
+  .ghost::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    background: #111;
+    border-radius: 50%;
+    top: 22px;
+  }
+  .ghost::before { left: 16px; }
+  .ghost::after  { right: 16px; }
+
+  .ghost.hit {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+
+  #flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 40, 40, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 5;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(5,5,15,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    text-align: center;
+  }
+
+  #overlay h1 {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    text-shadow: 0 0 20px #8080ff;
+  }
+
+  #overlay p { font-size: 1.2rem; opacity: 0.8; margin-bottom: 28px; }
+
+  button {
+    background: linear-gradient(135deg, #6060ff, #3030aa);
+    border: none;
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 600;
+    padding: 14px 40px;
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(80,80,255,0.5);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 35px rgba(100,100,255,0.7);
+  }
+  button:active { transform: scale(0.97); }
+
+  #final-score {
+    font-size: 2rem;
+    color: #7CFC00;
+    margin: 8px 0 24px;
+  }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <div class="stat">Score: <span id="score">0</span></div>
+  <div class="stat" id="combo">Combo x1</div>
+  <div class="stat">Time: <span id="time">30</span></div>
+</div>
+
+<div id="game-area">
+  <div id="flash"></div>
+</div>
+
+<div id="overlay">
+  <h1>👻 Shoot the Ghost</h1>
+  <p>Click the ghosts before they disappear!<br>30 seconds • progressive difficulty</p>
+  <button id="start-btn">Start Game</button>
+</div>
+
+<script>
+// ========== AUDIO ==========
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function ensureAudioContext() {
+  initAudio();
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playTone(freq, type, duration, volume = 0.15, slide = 0) {
+  ensureAudioContext();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (slide) {
+    osc.frequency.linearRampToValueAtTime(freq + slide, audioCtx.currentTime + duration);
+  }
+  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function sfxHit() {
+  playTone(880, 'square', 0.08, 0.12);
+  playTone(1320, 'sine', 0.12, 0.08, -400);
+}
+
+function sfxMiss() {
+  playTone(180, 'sawtooth', 0.18, 0.1, -80);
+}
+
+function sfxGameOver() {
+  playTone(440, 'triangle', 0.15, 0.1);
+  setTimeout(() => playTone(330, 'triangle', 0.2, 0.1), 150);
+  setTimeout(() => playTone(220, 'triangle', 0.4, 0.12, -50), 320);
+}
+
+// ========== GAME STATE ==========
+const gameArea = document.getElementById('game-area');
+const scoreEl  = document.getElementById('score');
+const timeEl   = document.getElementById('time');
+const comboEl  = document.getElementById('combo');
+const flashEl  = document.getElementById('flash');
+const overlay  = document.getElementById('overlay');
+const startBtn = document.getElementById('start-btn');
+
+let score = 0;
+let timeLeft = 30;
+let combo = 0;
+let spawnTimer = null;
+let gameTimer = null;
+let isPlaying = false;
+let baseInterval = 750;
+
+// ========== HELPERS ==========
+function random(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function updateUI() {
+  scoreEl.textContent = score;
+  timeEl.textContent = timeLeft;
+  if (combo > 1) {
+    comboEl.textContent = `Combo x${combo}`;
+    comboEl.style.opacity = 1;
+  } else {
+    comboEl.style.opacity = 0;
+  }
+}
+
+function flashMiss() {
+  flashEl.style.opacity = 1;
+  setTimeout(() => flashEl.style.opacity = 0, 120);
+}
+
+// ========== GHOST ==========
+function spawnGhost() {
+  if (!isPlaying) return;
+
+  const ghost = document.createElement('div');
+  ghost.className = 'ghost';
+  ghost.textContent = '👻';
+
+  const size = random(48, 72);
+  ghost.style.width = size + 'px';
+  ghost.style.height = size + 'px';
+  ghost.style.fontSize = (size * 0.45) + 'px';
+
+  const maxX = gameArea.clientWidth - size;
+  const maxY = gameArea.clientHeight - size - 40;
+  ghost.style.left = random(0, maxX) + 'px';
+  ghost.style.top  = random(60, maxY) + 'px';
+
+  // Lifetime decreases slightly as game progresses
+  const life = Math.max(900, 1800 - (30 - timeLeft) * 25);
+  let removed = false;
+
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    ghost.remove();
+  };
+
+  ghost.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (removed) return;
+    removed = true;
+
+    ghost.classList.add('hit');
+    sfxHit();
+    combo++;
+    score += 10 * Math.min(combo, 8); // soft combo cap
+    updateUI();
+    setTimeout(remove, 130);
+  });
+
+  gameArea.appendChild(ghost);
+  setTimeout(() => {
+    if (!removed) {
+      // Missed – fades out
+      ghost.style.opacity = 0;
+      ghost.style.transform = 'scale(0.6)';
+      setTimeout(remove, 200);
+    }
+  }, life);
+}
+
+// ========== GAME LOOP ==========
+function updateGameLoop() {
+  spawnGhost();
+
+  // Progressive difficulty: interval shrinks over time
+  const progressRatio = (30 - timeLeft) / 30;
+  const currentInterval = Math.max(280, baseInterval - progressRatio * 420);
+
+  clearInterval(spawnTimer);
+  spawnTimer = setInterval(updateGameLoop, currentInterval);
+}
+
+function startGame() {
+  ensureAudioContext();
+  isPlaying = true;
+  score = 0;
+  timeLeft = 30;
+  combo = 0;
+  updateUI();
+  overlay.style.display = 'none';
+
+  // Clear any leftover ghosts
+  document.querySelectorAll('.ghost').forEach(g => g.remove());
+
+  // Countdown
+  gameTimer = setInterval(() => {
+    timeLeft--;
+    updateUI();
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+
+  // First spawn + start dynamic loop
+  spawnGhost();
+  spawnTimer = setInterval(updateGameLoop, baseInterval);
+}
+
+function endGame() {
+  isPlaying = false;
+  clearInterval(spawnTimer);
+  clearInterval(gameTimer);
+  sfxGameOver();
+
+  // Final score overlay
+  overlay.innerHTML = `
+    <h1>Game Over</h1>
+    <div id="final-score">${score}</div>
+    <p>Nice shooting!</p>
+    <button id="restart-btn">Play Again</button>
+  `;
+  overlay.style.display = 'flex';
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    // Restore original overlay content for next start
+    location.reload(); // simplest clean restart
+  });
+}
+
+// Miss click (empty space)
+gameArea.addEventListener('click', () => {
+  if (!isPlaying) return;
+  combo = 0;
+  updateUI();
+  sfxMiss();
+  flashMiss();
+});
+
+// Start button
+startBtn.addEventListener('click', startGame);
+
+// Prevent context menu on long-press (mobile)
+document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>
