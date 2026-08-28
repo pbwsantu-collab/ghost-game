@@ -3,99 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Shoot the Ghost</title>
+<title>Shoot the Ghost — Advanced</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0a12;
-    color: #e0e0ff;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    height: 100vh;
+    background: #05050c;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #e0e0ff;
     user-select: none;
     -webkit-user-select: none;
   }
-
+  canvas {
+    display: block;
+    background: #05050c;
+    cursor: crosshair;
+  }
   #ui {
-    position: absolute;
+    position: fixed;
     top: 0; left: 0; right: 0;
-    padding: 16px 24px;
+    padding: 18px 28px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: linear-gradient(to bottom, rgba(10,10,20,0.9), transparent);
-    z-index: 10;
     pointer-events: none;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgba(5,5,15,0.85), transparent);
   }
-
   .stat {
-    font-size: 1.25rem;
+    font-size: 1.35rem;
     font-weight: 600;
     letter-spacing: 0.5px;
+    text-shadow: 0 0 12px rgba(100,100,255,0.5);
   }
-
   #score { color: #7CFC00; }
   #time  { color: #FFD700; }
-  #combo { color: #FF69B4; opacity: 0; transition: opacity 0.2s; }
-
-  #game-area {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    cursor: crosshair;
-    overflow: hidden;
-  }
-
-  .ghost {
-    position: absolute;
-    width: 64px;
-    height: 64px;
-    border-radius: 50% 50% 40% 40%;
-    background: radial-gradient(circle at 30% 30%, #fff, #a0a0ff 40%, #4040aa);
-    box-shadow: 0 0 20px #8080ff, inset 0 -8px 12px rgba(0,0,0,0.3);
-    cursor: pointer;
-    transition: transform 0.12s ease-out, opacity 0.12s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-  }
-
-  .ghost::before,
-  .ghost::after {
-    content: '';
-    position: absolute;
-    width: 12px; height: 12px;
-    background: #111;
-    border-radius: 50%;
-    top: 22px;
-  }
-  .ghost::before { left: 16px; }
-  .ghost::after  { right: 16px; }
-
-  .ghost.hit {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-
-  #flash {
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 40, 40, 0.35);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s;
-    z-index: 5;
-  }
+  #combo { color: #FF69B4; opacity: 0; transition: opacity 0.25s; }
 
   #overlay {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    background: rgba(5,5,15,0.85);
+    background: rgba(3,3,12,0.88);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -103,38 +51,35 @@
     z-index: 20;
     text-align: center;
   }
-
   #overlay h1 {
-    font-size: 3rem;
-    margin-bottom: 12px;
-    text-shadow: 0 0 20px #8080ff;
+    font-size: 3.4rem;
+    margin-bottom: 10px;
+    text-shadow: 0 0 30px #8080ff, 0 0 60px #4040aa;
   }
-
-  #overlay p { font-size: 1.2rem; opacity: 0.8; margin-bottom: 28px; }
-
+  #overlay p { font-size: 1.25rem; opacity: 0.85; margin-bottom: 32px; line-height: 1.5; }
+  #final-score {
+    font-size: 2.8rem;
+    color: #7CFC00;
+    margin: 12px 0 28px;
+    text-shadow: 0 0 20px #7CFC00;
+  }
   button {
-    background: linear-gradient(135deg, #6060ff, #3030aa);
+    background: linear-gradient(135deg, #7070ff, #3030bb);
     border: none;
     color: white;
-    font-size: 1.3rem;
+    font-size: 1.35rem;
     font-weight: 600;
-    padding: 14px 40px;
-    border-radius: 40px;
+    padding: 16px 48px;
+    border-radius: 50px;
     cursor: pointer;
-    box-shadow: 0 0 25px rgba(80,80,255,0.5);
+    box-shadow: 0 0 30px rgba(100,100,255,0.55);
     transition: transform 0.15s, box-shadow 0.15s;
   }
   button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 35px rgba(100,100,255,0.7);
+    transform: scale(1.06);
+    box-shadow: 0 0 45px rgba(120,120,255,0.75);
   }
   button:active { transform: scale(0.97); }
-
-  #final-score {
-    font-size: 2rem;
-    color: #7CFC00;
-    margin: 8px 0 24px;
-  }
 </style>
 </head>
 <body>
@@ -145,90 +90,231 @@
   <div class="stat">Time: <span id="time">30</span></div>
 </div>
 
-<div id="game-area">
-  <div id="flash"></div>
-</div>
+<canvas id="c"></canvas>
 
 <div id="overlay">
   <h1>👻 Shoot the Ghost</h1>
-  <p>Click the ghosts before they disappear!<br>30 seconds • progressive difficulty</p>
+  <p>Advanced Canvas Edition<br>Click the ghosts • Build combos • Survive 30 seconds</p>
   <button id="start-btn">Start Game</button>
 </div>
 
 <script>
-// ========== AUDIO ==========
+// ===================== AUDIO =====================
 let audioCtx = null;
-
 function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
-
-function ensureAudioContext() {
+function ensureAudio() {
   initAudio();
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
 }
-
-function playTone(freq, type, duration, volume = 0.15, slide = 0) {
-  ensureAudioContext();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-  if (slide) {
-    osc.frequency.linearRampToValueAtTime(freq + slide, audioCtx.currentTime + duration);
-  }
-  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + duration);
+function playTone(freq, type, dur, vol = 0.12, slide = 0) {
+  ensureAudio();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (slide) o.frequency.linearRampToValueAtTime(freq + slide, audioCtx.currentTime + dur);
+  g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + dur);
 }
-
 function sfxHit() {
-  playTone(880, 'square', 0.08, 0.12);
-  playTone(1320, 'sine', 0.12, 0.08, -400);
+  playTone(920, 'square', 0.07, 0.1);
+  playTone(1400, 'sine', 0.11, 0.07, -500);
 }
-
 function sfxMiss() {
-  playTone(180, 'sawtooth', 0.18, 0.1, -80);
+  playTone(160, 'sawtooth', 0.2, 0.09, -70);
+}
+function sfxOver() {
+  playTone(440, 'triangle', 0.14, 0.09);
+  setTimeout(() => playTone(330, 'triangle', 0.18, 0.09), 140);
+  setTimeout(() => playTone(220, 'triangle', 0.35, 0.11, -40), 300);
 }
 
-function sfxGameOver() {
-  playTone(440, 'triangle', 0.15, 0.1);
-  setTimeout(() => playTone(330, 'triangle', 0.2, 0.1), 150);
-  setTimeout(() => playTone(220, 'triangle', 0.4, 0.12, -50), 320);
-}
+// ===================== CANVAS SETUP =====================
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
 
-// ========== GAME STATE ==========
-const gameArea = document.getElementById('game-area');
-const scoreEl  = document.getElementById('score');
-const timeEl   = document.getElementById('time');
-const comboEl  = document.getElementById('combo');
-const flashEl  = document.getElementById('flash');
-const overlay  = document.getElementById('overlay');
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ===================== GAME STATE =====================
+let score = 0, timeLeft = 30, combo = 0;
+let isPlaying = false;
+let lastTime = 0;
+let spawnAcc = 0;
+let baseInterval = 0.72; // seconds
+let shake = 0, flash = 0;
+
+const scoreEl = document.getElementById('score');
+const timeEl  = document.getElementById('time');
+const comboEl = document.getElementById('combo');
+const overlay = document.getElementById('overlay');
 const startBtn = document.getElementById('start-btn');
 
-let score = 0;
-let timeLeft = 30;
-let combo = 0;
-let spawnTimer = null;
-let gameTimer = null;
-let isPlaying = false;
-let baseInterval = 750;
-
-// ========== HELPERS ==========
-function random(min, max) {
-  return Math.random() * (max - min) + min;
+// ===================== PARTICLE SYSTEM (pooled) =====================
+class Particle {
+  constructor() { this.reset(0,0); }
+  reset(x, y) {
+    this.x = x; this.y = y;
+    this.vx = (Math.random() - 0.5) * 11;
+    this.vy = (Math.random() - 0.5) * 11;
+    this.life = 1;
+    this.decay = 0.018 + Math.random() * 0.025;
+    this.size = 2.5 + Math.random() * 5;
+    this.hue = 200 + Math.random() * 50;
+  }
+  update(dt) {
+    this.x += this.vx * dt * 60;
+    this.y += this.vy * dt * 60;
+    this.vx *= 0.96;
+    this.vy *= 0.96;
+    this.life -= this.decay * dt * 60;
+  }
+  draw() {
+    if (this.life <= 0) return;
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = `hsl(${this.hue}, 85%, 65%)`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
+const PARTICLE_POOL_SIZE = 220;
+const particlePool = Array.from({length: PARTICLE_POOL_SIZE}, () => new Particle());
+let activeParticles = [];
+
+function spawnExplosion(x, y, count = 16) {
+  for (let i = 0; i < count; i++) {
+    const p = particlePool.pop() || new Particle();
+    p.reset(x, y);
+    activeParticles.push(p);
+  }
+}
+
+// ===================== GHOST =====================
+class Ghost {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.size = 42 + Math.random() * 28;
+    this.x = this.size + Math.random() * (W - this.size * 2);
+    this.y = 90 + Math.random() * (H - 180);
+    this.life = 1.35 + Math.random() * 0.5;
+    this.maxLife = this.life;
+    this.vx = (Math.random() - 0.5) * 0.6;
+    this.vy = (Math.random() - 0.5) * 0.4;
+    this.rot = (Math.random() - 0.5) * 0.4;
+    this.rotSpeed = (Math.random() - 0.5) * 1.2;
+    this.hit = false;
+    this.scale = 1;
+    this.alpha = 1;
+  }
+  update(dt) {
+    if (this.hit) {
+      this.scale *= 0.82;
+      this.alpha *= 0.75;
+      return this.alpha > 0.05;
+    }
+    this.x += this.vx * dt * 60;
+    this.y += this.vy * dt * 60;
+    this.rot += this.rotSpeed * dt;
+    this.life -= dt;
+    // gentle float
+    this.y += Math.sin(performance.now() * 0.003 + this.x) * 0.15;
+    return this.life > 0;
+  }
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    ctx.scale(this.scale, this.scale);
+    ctx.globalAlpha = this.alpha;
+
+    // soft glow
+    ctx.shadowColor = '#8080ff';
+    ctx.shadowBlur = 22;
+
+    // body
+    const g = ctx.createRadialGradient(-this.size*0.25, -this.size*0.3, 2, 0, 0, this.size);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.35, '#b0b0ff');
+    g.addColorStop(1, '#3030aa');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.size * 0.5, Math.PI, 0);
+    ctx.quadraticCurveTo(this.size*0.45, this.size*0.55, 0, this.size*0.45);
+    ctx.quadraticCurveTo(-this.size*0.45, this.size*0.55, -this.size*0.5, 0);
+    ctx.fill();
+
+    // eyes
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(-this.size*0.18, -this.size*0.08, this.size*0.09, 0, Math.PI*2);
+    ctx.arc( this.size*0.18, -this.size*0.08, this.size*0.09, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+  contains(px, py) {
+    const dx = px - this.x, dy = py - this.y;
+    return dx*dx + dy*dy < (this.size * 0.55) ** 2;
+  }
+}
+
+let ghosts = [];
+const ghostPool = [];
+
+function spawnGhost() {
+  const g = ghostPool.pop() || new Ghost();
+  g.reset();
+  ghosts.push(g);
+}
+
+// ===================== INPUT =====================
+canvas.addEventListener('pointerdown', e => {
+  if (!isPlaying) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top)  * (canvas.height / rect.height);
+
+  let hit = false;
+  for (let i = ghosts.length - 1; i >= 0; i--) {
+    const g = ghosts[i];
+    if (!g.hit && g.contains(x, y)) {
+      g.hit = true;
+      spawnExplosion(g.x, g.y, 18);
+      sfxHit();
+      combo++;
+      score += 10 * Math.min(combo, 10);
+      updateUI();
+      hit = true;
+      break;
+    }
+  }
+  if (!hit) {
+    combo = 0;
+    updateUI();
+    sfxMiss();
+    flash = 0.32;
+    shake = 10;
+  }
+});
+
+// ===================== UI & FLOW =====================
 function updateUI() {
   scoreEl.textContent = score;
-  timeEl.textContent = timeLeft;
+  timeEl.textContent = Math.ceil(timeLeft);
   if (combo > 1) {
     comboEl.textContent = `Combo x${combo}`;
     comboEl.style.opacity = 1;
@@ -237,132 +323,126 @@ function updateUI() {
   }
 }
 
-function flashMiss() {
-  flashEl.style.opacity = 1;
-  setTimeout(() => flashEl.style.opacity = 0, 120);
-}
-
-// ========== GHOST ==========
-function spawnGhost() {
-  if (!isPlaying) return;
-
-  const ghost = document.createElement('div');
-  ghost.className = 'ghost';
-  ghost.textContent = '👻';
-
-  const size = random(48, 72);
-  ghost.style.width = size + 'px';
-  ghost.style.height = size + 'px';
-  ghost.style.fontSize = (size * 0.45) + 'px';
-
-  const maxX = gameArea.clientWidth - size;
-  const maxY = gameArea.clientHeight - size - 40;
-  ghost.style.left = random(0, maxX) + 'px';
-  ghost.style.top  = random(60, maxY) + 'px';
-
-  // Lifetime decreases slightly as game progresses
-  const life = Math.max(900, 1800 - (30 - timeLeft) * 25);
-  let removed = false;
-
-  const remove = () => {
-    if (removed) return;
-    removed = true;
-    ghost.remove();
-  };
-
-  ghost.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (removed) return;
-    removed = true;
-
-    ghost.classList.add('hit');
-    sfxHit();
-    combo++;
-    score += 10 * Math.min(combo, 8); // soft combo cap
-    updateUI();
-    setTimeout(remove, 130);
-  });
-
-  gameArea.appendChild(ghost);
-  setTimeout(() => {
-    if (!removed) {
-      // Missed – fades out
-      ghost.style.opacity = 0;
-      ghost.style.transform = 'scale(0.6)';
-      setTimeout(remove, 200);
-    }
-  }, life);
-}
-
-// ========== GAME LOOP ==========
-function updateGameLoop() {
-  spawnGhost();
-
-  // Progressive difficulty: interval shrinks over time
-  const progressRatio = (30 - timeLeft) / 30;
-  const currentInterval = Math.max(280, baseInterval - progressRatio * 420);
-
-  clearInterval(spawnTimer);
-  spawnTimer = setInterval(updateGameLoop, currentInterval);
-}
-
 function startGame() {
-  ensureAudioContext();
+  ensureAudio();
   isPlaying = true;
-  score = 0;
-  timeLeft = 30;
-  combo = 0;
+  score = 0; timeLeft = 30; combo = 0;
+  ghosts = []; activeParticles = [];
+  spawnAcc = 0;
   updateUI();
   overlay.style.display = 'none';
-
-  // Clear any leftover ghosts
-  document.querySelectorAll('.ghost').forEach(g => g.remove());
-
-  // Countdown
-  gameTimer = setInterval(() => {
-    timeLeft--;
-    updateUI();
-    if (timeLeft <= 0) endGame();
-  }, 1000);
-
-  // First spawn + start dynamic loop
-  spawnGhost();
-  spawnTimer = setInterval(updateGameLoop, baseInterval);
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
 }
 
 function endGame() {
   isPlaying = false;
-  clearInterval(spawnTimer);
-  clearInterval(gameTimer);
-  sfxGameOver();
-
-  // Final score overlay
+  sfxOver();
   overlay.innerHTML = `
     <h1>Game Over</h1>
     <div id="final-score">${score}</div>
-    <p>Nice shooting!</p>
+    <p>Well played!</p>
     <button id="restart-btn">Play Again</button>
   `;
   overlay.style.display = 'flex';
-  document.getElementById('restart-btn').addEventListener('click', () => {
-    // Restore original overlay content for next start
-    location.reload(); // simplest clean restart
-  });
+  document.getElementById('restart-btn').onclick = () => location.reload();
 }
 
-// Miss click (empty space)
-gameArea.addEventListener('click', () => {
-  if (!isPlaying) return;
-  combo = 0;
-  updateUI();
-  sfxMiss();
-  flashMiss();
-});
-
-// Start button
 startBtn.addEventListener('click', startGame);
 
-// Prevent context menu on long-press (mobile)
+// ===================== MAIN LOOP =====================
+function loop(now) {
+  if (!isPlaying) return;
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  // time
+  timeLeft -= dt;
+  if (timeLeft <= 0) {
+    timeLeft = 0;
+    endGame();
+    return;
+  }
+
+  // progressive difficulty
+  const progress = (30 - timeLeft) / 30;
+  const interval = Math.max(0.28, baseInterval - progress * 0.42);
+  spawnAcc += dt;
+  if (spawnAcc >= interval) {
+    spawnAcc = 0;
+    spawnGhost();
+  }
+
+  // update ghosts
+  for (let i = ghosts.length - 1; i >= 0; i--) {
+    if (!ghosts[i].update(dt)) {
+      ghostPool.push(ghosts[i]);
+      ghosts.splice(i, 1);
+    }
+  }
+
+  // update particles
+  for (let i = activeParticles.length - 1; i >= 0; i--) {
+    const p = activeParticles[i];
+    p.update(dt);
+    if (p.life <= 0) {
+      particlePool.push(p);
+      activeParticles.splice(i, 1);
+    }
+  }
+
+  // decay effects
+  shake *= 0.88;
+  flash *= 0.82;
+
+  // ---------- RENDER ----------
+  ctx.save();
+  // screen shake
+  if (shake > 0.5) {
+    ctx.translate(
+      (Math.random() - 0.5) * shake,
+      (Math.random() - 0.5) * shake
+    );
+  }
+
+  // clear with slight trail for motion feel
+  ctx.fillStyle = 'rgba(5,5,12,0.35)';
+  ctx.fillRect(0, 0, W, H);
+
+  // ambient vignette-ish background dots (very cheap)
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#4040aa';
+  for (let i = 0; i < 18; i++) {
+    const px = (Math.sin(now * 0.0003 + i * 1.7) * 0.5 + 0.5) * W;
+    const py = (Math.cos(now * 0.00025 + i * 2.1) * 0.5 + 0.5) * H;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ghosts
+  ghosts.forEach(g => g.draw());
+
+  // particles (additive)
+  ctx.globalCompositeOperation = 'lighter';
+  activeParticles.forEach(p => p.draw());
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+
+  // miss flash
+  if (flash > 0.02) {
+    ctx.fillStyle = `rgba(255, 30, 40, ${flash})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.restore();
+
+  updateUI();
+  requestAnimationFrame(loop);
+}
+
+// prevent long-press menu
 document.addEventListener('contextmenu', e => e.preventDefault());
 </script>
 </body>
